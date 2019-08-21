@@ -19,7 +19,7 @@ const videoEl=document.getElementById('inputVideo')
       stream=>videoEl.srcObject=stream,
       err=>console.log(err)
   )
-  onPlay(videoEl)//calling the onPlay()
+  onPlay(videoEl)//calling the onPlay() method
 }
 
 //global declarations
@@ -29,6 +29,8 @@ var count=0;
 var expression;
 var max=0;
 var map=new Map();
+var labeledFaceDescriptors=0;
+
 
 //The main onplay function for faceDetection and Expressions
 async function onPlay(videoEl){
@@ -41,54 +43,56 @@ async function onPlay(videoEl){
 
   //This will detect all the images in the webCam
   let fullFaceDescriptions = await faceapi.detectAllFaces(videoEl, options).withFaceLandmarks().withFaceExpressions().withFaceDescriptors()
-  
   //resizing the detected face to the displaySize
   fullFaceDescriptions=faceapi.resizeResults(fullFaceDescriptions,displaySize)
-  
+  // faceapi.draw.drawFaceExpressions(canvas, fullFaceDescriptions);
   //Names of labels(Project Directory)
-  const labels = ['praveen','varun_sir']
-  
+  const labels = ['praveen','varun_sir','praveen1','praveen2','praveen3']
+     
   /*This labeledFaceDescriptor is used for the mapping images to the detected face in fullFaceDescription
     and also check the webcam images contain face or not.
   */
-  const labeledFaceDescriptors = await Promise.all( 
-    labels.map(async label => { 
+ if(count==0){
+  labeledFaceDescriptors = await Promise.all( 
+  labels.map(async label => { 
 
-      // fetch image data from urls and convert blob to HTMLImage element
-      const imgUrl = `./${label}.jpg`
-      const img = await faceapi.fetchImage(imgUrl)
-     
-      // detect the face with the highest score in the image and compute it's landmarks and face descriptor
-      const fullFaceDescription = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceExpressions().withFaceDescriptor()
+    // fetch image data from urls and convert blob to HTMLImage element
+    const imgUrl = `./images/${label}.jpg`;
+    const img = await faceapi.fetchImage(imgUrl)
+   
+    // detect the face with the highest score in the image and compute it's landmarks and face descriptor
+    const fullFaceDescription = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceExpressions().withFaceDescriptor()
+   if (!fullFaceDescription) { 
+    throw new Error(`no faces detected for ${label}`)
+    }
+  
+  //  const faceDescriptors = [fullFaceDescription.descriptor]
+   const faceDescriptors = [fullFaceDescription.descriptor]
 
-     if (!fullFaceDescription) { 
-      throw new Error(`no faces detected for ${label}`)
-      }
-    
-     const faceDescriptors = [fullFaceDescription.descriptor]
-        return new faceapi.LabeledFaceDescriptors(label, faceDescriptors)
-    })
+      return new faceapi.LabeledFaceDescriptors(label, faceDescriptors)
+  })
   )  
-
-
+  }
   const maxDescriptorDistance = 0.6
   //faceMatcher take the highest confidence and refernce and query image.
   const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, maxDescriptorDistance)
   count++;
-  console.log("outside"+count);
+  // console.log("outside"+count);
 
   //the result holds the complete mapping of refernce and query images(by using the Array values)
   results = fullFaceDescriptions.map(fd => faceMatcher.findBestMatch(fd.descriptor))
   
   //This iterates give the detected faces in images
   results.forEach((bestMatch, i) => {
-    console.log(bestMatch);
+    // console.log(bestMatch);
     const box = fullFaceDescriptions[i].detection.box;
     const text = bestMatch.toString();  //this for basMatch name detection
-    console.log("inside"+count);
+  
     var str=""
-      for(var i of text){
-        if(i!='('){
+    var val = text.replace(/[0-9]/g, '');
+      for(let i of val){
+        // if(i!=" "||i!="("||i!='0'||i!='1'||i!='2'||i!='3'||i!='4'||i!='5'||i!='6'||i!='7'||i!='8'||i!='9'||i!='10'){
+         if(i!=" "){
         str+=i;
         }
         else{
@@ -97,7 +101,6 @@ async function onPlay(videoEl){
       }
       if(NameArray.includes(str)===false)
         NameArray.push(str);
-        // console.log(str);
     const drawBox = new faceapi.draw.DrawBox(box, { label: text })
       // faceapi.draw.drawFaceExpressions(canvas, fullFaceDescriptions)//FaceExpression=fullFaceDescription  *(face-api.js)*
     drawBox.draw(canvas);
@@ -111,31 +114,50 @@ async function onPlay(videoEl){
     onPlay(videoEl)
   },200)
 
-  if(count>=10){
+  if(count>=50){
   clearInterval(call);
   }
 }
+var limit=10;
+function test(Expression,Name){
 
-function test(e,Name){
-  console.log(e+" how is it");
-  console.log(Name);
+  // console.log(e+" how is it");
+  // console.log(Name);
+  if(map.has(Name)){
+    // NameArray.push(Expression);
+    // var temp=Expression;
+    var append=map.get(Name);
+    map.set(Name,append+=`,${Expression}`);
+  }else{
+    map.set(Name,Expression);
+  }
+  
   NameArray=[];
-  // if(NameArray.includes(f)===false)
-  // NameArray.push(f);
-  ExpressionArray.push(e)
-    if(count==10){
+  // ExpressionArray.push(e)
+    if(count==limit){
      max=0;
-      for(let i=0;i<ExpressionArray.length;i++){
-        let counter=0;
-          for(let j=0;j<ExpressionArray.length;j++){
-            if(ExpressionArray[i]==ExpressionArray[j]){
+     var counter=0;
+     var Keys=map.keys();
+     for(let e of Keys){
+       var Values=map.get(e);
+       var Array=Values.split(",");
+        for(let l=0;l<Array.length;l++){
+
+          for(let m=0;m<Array.length;m++){
+             counter=0;
+             if(Array[l]==Array[m]){
                 counter++;
-            }
+              }
           }
           if(counter>max){
             max=counter;
-            expression=ExpressionArray[i];
+            expression=Array[l];
           }
-      }
+        }
+        map.set(e,expression);
+     }
+      console.log(map);
+      // console.log(expression);
+      limit=limit+10;
     }
 }
